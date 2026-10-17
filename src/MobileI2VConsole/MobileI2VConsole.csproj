@@ -11,8 +11,8 @@
 
     <ApplicationTitle>MobileI2V</ApplicationTitle>
     <ApplicationId>com.mobilei2v.console</ApplicationId>
-    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
-    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>1.0.1</ApplicationDisplayVersion>
+    <ApplicationVersion>2</ApplicationVersion>
 
     <SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
   </PropertyGroup>
@@ -22,19 +22,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- App Icon -->
     <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appicon.svg" Color="#1A1A2E" />
-
-    <!-- Splash Screen -->
     <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#1A1A2E" BaseSize="128,128" />
-
-    <!-- Images -->
     <MauiImage Include="Resources\Images\*" />
-
-    <!-- Custom Fonts -->
     <MauiFont Include="Resources\Fonts\*" />
-
-    <!-- Raw Assets -->
     <MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
     <EmbeddedResource Include="Resources\Raw\PromptTemplates.json" />
   </ItemGroup>
@@ -47,5 +38,22 @@
     <PackageReference Include="CommunityToolkit.Maui.MediaElement" Version="10.0.0" />
     <PackageReference Include="SkiaSharp" Version="4.148.0" />
   </ItemGroup>
+
+  <!--
+    Android-only workaround for duplicate ONNX Runtime native assets.
+    The NuGet package also contains Linux ARM64 binaries; Android must use
+    the Bionic-compatible library supplied by runtimes/android/native/onnxruntime.aar.
+    Remove Linux native copy/publish items so they cannot overwrite the Android AAR.
+  -->
+  <Target Name="RemoveLinuxOnnxNativeAssets"
+          Condition="$([MSBuild]::IsOSPlatform('windows')) == 'false' Or '$(TargetFramework)' == 'net10.0-android'"
+          AfterTargets="ResolvePackageAssets">
+    <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-android'">
+      <NativeCopyLocalItems Remove="@(NativeCopyLocalItems)"
+          Condition="$([System.String]::Copy('%(NativeCopyLocalItems.PathInPackage)').Contains('linux-'))" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+          Condition="$([System.String]::Copy('%(ResolvedFileToPublish.PathInPackage)').Contains('linux-'))" />
+    </ItemGroup>
+  </Target>
 
 </Project>
