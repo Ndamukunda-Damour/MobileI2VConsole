@@ -27,10 +27,15 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Set up .NET 10
+      - name: Set up .NET 10.0.301
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '10.0.301'
+
+      - name: Show build toolchain
+        run: |
+          dotnet --info
+          java -version
 
       - name: Install Android SDK tools
         uses: android-actions/setup-android@v3
@@ -50,6 +55,22 @@ jobs:
 
       - name: Build Release APK
         run: dotnet publish src/MobileI2VConsole/MobileI2VConsole.csproj --configuration Release --framework net10.0-android
+
+      - name: Validate Android ONNX native library
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$(find src/MobileI2VConsole/bin/Release/net10.0-android -type f -name '*.apk' -print -quit)"
+          test -n "$APK"
+          echo "Inspecting: $APK"
+          unzip -l "$APK" | grep -F 'lib/arm64-v8a/libonnxruntime.so'
+          unzip -p "$APK" lib/arm64-v8a/libonnxruntime.so > /tmp/libonnxruntime.so
+          readelf -d /tmp/libonnxruntime.so | grep NEEDED
+          if readelf -d /tmp/libonnxruntime.so | grep -E 'libdl\.so\.2|librt\.so\.1|libc\.so\.6|ld-linux-aarch64\.so\.1'; then
+            echo "ERROR: Linux/glibc ONNX Runtime library was packaged into the Android APK."
+            exit 1
+          fi
+          echo "ONNX Runtime native library passed Android dependency check."
 
       - name: Find generated APK
         shell: bash
