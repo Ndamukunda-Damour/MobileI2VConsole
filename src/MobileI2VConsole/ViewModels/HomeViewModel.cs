@@ -4,7 +4,6 @@ using MobileI2VConsole.Models;
 using MobileI2VConsole.Services;
 using System.Collections.ObjectModel;
 using System.Text.Json;
-using Microsoft.Maui.Storage;
 
 namespace MobileI2VConsole.ViewModels;
 
@@ -62,25 +61,32 @@ public partial class HomeViewModel : ObservableObject
     {
         try
         {
-            // Try loading from embedded resource
+            // Read the embedded resource synchronously without blocking on an async MAUI API.
             var assembly = typeof(HomeViewModel).Assembly;
-            using var stream = FileSystem.OpenAppPackageFileAsync("PromptTemplates.json").Result;
-            if (stream != null)
+            var resourceName = assembly.GetManifestResourceNames()
+                .FirstOrDefault(name => name.EndsWith("PromptTemplates.json", StringComparison.OrdinalIgnoreCase));
+            using var stream = resourceName is null ? null : assembly.GetManifestResourceStream(resourceName);
+            if (stream is not null)
             {
                 using var reader = new StreamReader(stream);
                 var json = reader.ReadToEnd();
                 var templates = JsonSerializer.Deserialize<List<PromptTemplate>>(json);
-                if (templates != null)
+                if (templates is not null)
                 {
                     PromptTemplates.Clear();
-                    foreach (var t in templates)
-                        PromptTemplates.Add(t);
+                    foreach (var template in templates)
+                        PromptTemplates.Add(template);
+                    return;
                 }
             }
         }
-        catch(Exception ex)
+        catch
         {
-            // Fallback defaults
+            // Use safe defaults if the embedded template resource is unavailable.
+        }
+
+        if (PromptTemplates.Count == 0)
+        {
             PromptTemplates.Add(new PromptTemplate { Name = "Gentle Motion", Prompt = "gentle motion, smooth and subtle movement", Icon = "🌊" });
             PromptTemplates.Add(new PromptTemplate { Name = "Cinematic Pan", Prompt = "cinematic panning shot, slow camera movement", Icon = "🎬" });
         }
@@ -125,7 +131,7 @@ public partial class HomeViewModel : ObservableObject
                 DownloadStatusText = $"Downloading {status.ModelName}... {status.DownloadProgress:P0}";
             });
 
-            var success = true;// all models are bundled in assets, so no download is needed. //await _modelManager.DownloadModelsAsync(progress);
+            var success = true; // Model downloads are handled separately by the current UI flow.
             if (success)
             {
                 IsModelDownloaded = true;
@@ -153,7 +159,7 @@ public partial class HomeViewModel : ObservableObject
 
         if (!IsModelDownloaded)
         {
-            await Shell.Current.DisplayAlert("Models Not Ready", 
+            await Shell.Current.DisplayAlert("Models Not Ready",
                 "Please download the AI models first.", "OK");
             return;
         }
@@ -192,7 +198,6 @@ public partial class HomeViewModel : ObservableObject
             return;
         }
 
-        // Try extracting bundled models from app package (Resources/Raw)
         DownloadStatusText = "Extracting bundled models...";
         try
         {
