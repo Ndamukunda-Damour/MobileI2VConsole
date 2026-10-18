@@ -11,14 +11,16 @@
 
     <ApplicationTitle>MobileI2V</ApplicationTitle>
     <ApplicationId>com.mobilei2v.console</ApplicationId>
-    <ApplicationDisplayVersion>1.0.1</ApplicationDisplayVersion>
-    <ApplicationVersion>2</ApplicationVersion>
+    <ApplicationDisplayVersion>1.0.2</ApplicationDisplayVersion>
+    <ApplicationVersion>3</ApplicationVersion>
 
     <SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
-  </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net10.0-android|AnyCPU'">
-    <EmbedAssembliesIntoApk>True</EmbedAssembliesIntoApk>
+    <!-- Work around .NET 10 Android Release startup failures involving generated marshal methods. -->
+    <AndroidEnableMarshalMethods>false</AndroidEnableMarshalMethods>
+    <!-- Make Release APK self-contained; avoid debug-style fast deployment paths. -->
+    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+    <AndroidFastDeployment>false</AndroidFastDeployment>
   </PropertyGroup>
 
   <ItemGroup>
@@ -39,20 +41,15 @@
     <PackageReference Include="SkiaSharp" Version="4.148.0" />
   </ItemGroup>
 
-  <!--
-    Android-only workaround for duplicate ONNX Runtime native assets.
-    The NuGet package also contains Linux ARM64 binaries; Android must use
-    the Bionic-compatible library supplied by runtimes/android/native/onnxruntime.aar.
-    Remove Linux native copy/publish items so they cannot overwrite the Android AAR.
-  -->
+  <!-- Prevent Linux/glibc ONNX assets from replacing the Android/Bionic native library. -->
   <Target Name="RemoveLinuxOnnxNativeAssets"
-          Condition="$([MSBuild]::IsOSPlatform('windows')) == 'false' Or '$(TargetFramework)' == 'net10.0-android'"
+          Condition="'$(TargetFramework)' == 'net10.0-android'"
           AfterTargets="ResolvePackageAssets">
-    <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-android'">
+    <ItemGroup>
       <NativeCopyLocalItems Remove="@(NativeCopyLocalItems)"
-          Condition="$([System.String]::Copy('%(NativeCopyLocalItems.PathInPackage)').Contains('linux-'))" />
+          Condition="$([System.String]::Copy('%(NativeCopyLocalItems.PathInPackage)').Contains('runtimes/linux-'))" />
       <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
-          Condition="$([System.String]::Copy('%(ResolvedFileToPublish.PathInPackage)').Contains('linux-'))" />
+          Condition="$([System.String]::Copy('%(ResolvedFileToPublish.PathInPackage)').Contains('runtimes/linux-'))" />
     </ItemGroup>
   </Target>
 
